@@ -2,10 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Position du soleil et temps d'exposition optimal de Sol'Ex</title>
+    <title>Observation du soleil et temps d'exposition pour Sol'Ex</title>
+    <!-- Importation de la police moderne depuis Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto&display=swap">
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Roboto', sans-serif;
             margin: 20px;
         }
 
@@ -15,18 +17,50 @@
 
         #container {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             justify-content: center;
+            align-items: flex-start;
         }
 
         #results {
-            flex: 1 1 400px;
+            flex: 1 1 600px;
             margin-right: 20px;
         }
 
         #exposureTimeSection {
             flex: 1 1 300px;
             margin-left: 20px;
+        }
+
+        #infoContainer {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: flex-start;
+        }
+
+        #positionInfo {
+            flex: 1;
+        }
+
+        #imagesSection {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #imagesSection img {
+            max-width: 49%;
+            height: auto;
+            margin: 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .result-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
         }
 
         form {
@@ -58,12 +92,6 @@
             background-color: #0056b3;
         }
 
-        .result-box {
-            background-color: #f9f9f9;
-            padding: 15px;
-            border-radius: 5px;
-        }
-
         #exposureTimeResult {
             margin-top: 20px;
             padding: 15px;
@@ -75,28 +103,42 @@
             font-weight: bold;
         }
 
+        /* Styles pour les appareils mobiles */
         @media (max-width: 800px) {
             #container {
                 flex-direction: column;
             }
 
-            #results, #exposureTimeSection {
+            #results {
+                display: none; /* Masquer les résultats sur mobile */
+            }
+
+            #exposureTimeSection {
                 margin: 0;
+                width: 100%;
             }
         }
     </style>
 </head>
 <body>
-    <h1>Position du soleil et temps d'exposition optimal de Sol'Ex</h1>
+    <h1>Observation du soleil et temps d'exposition pour Sol'Ex</h1>
 
     <div id="container">
         <div id="results" class="result-box">
-            <h2>Résultats :</h2>
-            <p id="resultsContent"></p>
+            <div id="infoContainer">
+                <div id="positionInfo">
+                    <p id="resultsContent"></p>
+                </div>
+            </div>
+            <div id="imagesSection">
+                <img id="image1" src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_512_0304.jpg" alt="Image du Soleil à 304 Å">
+                <img id="image2" src="https://sdo.gsfc.nasa.gov/assets/img/latest/latest_512_HMIIC.jpg" alt="Image du Soleil en continuum">
+            </div>
+            <p style="font-size: 12px; text-align: center;">Crédit : NASA/SDO</p>
         </div>
 
         <div id="exposureTimeSection" class="result-box">
-            <h2>Calcul du temps d'exposition</h2>
+            <h2>Calculatrice du temps d'exposition</h2>
             <form id="exposureTimeForm">
                 <label for="V">V (multiple de la vitesse sidérale) :</label>
                 <input type="number" id="V" name="V" value="20" required>
@@ -164,16 +206,13 @@
             var results = "<strong>Votre Position :</strong><br>" +
                           "Latitude : " + latitude.toFixed(6) + " degrés<br>" +
                           "Longitude : " + longitude.toFixed(6) + " degrés<br><br>" +
-                          "<strong>Date et Heure :</strong><br>" + dateTime.toUTCString() + "<br><br>" +
+                          "<strong>Date et Heure :</strong><br>" + dateTime.toLocaleString() + "<br><br>" +
                           "<strong>Ascension Droite :</strong> " + raHMS + "<br>" +
                           "<strong>Déclinaison :</strong> " + decDMS + "<br><br>" +
                           "<strong>Azimut :</strong> " + azimuthDMS + "<br>" +
                           "<strong>Altitude :</strong> " + altitudeDMS;
 
             document.getElementById("resultsContent").innerHTML = results;
-
-            // Afficher la section du temps d'exposition
-            document.getElementById("exposureTimeSection").style.display = "block";
 
             // Préremplir le champ delta avec la déclinaison calculée
             document.getElementById("delta").value = sunCoords.declination.toFixed(6);
