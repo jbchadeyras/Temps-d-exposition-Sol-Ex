@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Position du soleil et temps d'exposition optimal de Sol'Ex</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        #container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #results {
+            flex: 1 1 400px;
+            margin-right: 20px;
+        }
+
+        #exposureTimeSection {
+            flex: 1 1 300px;
+            margin-left: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        form label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        form input {
+            margin-bottom: 15px;
+            padding: 8px;
+            font-size: 16px;
+        }
+
+        form button {
+            padding: 10px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        form button:hover {
+            background-color: #0056b3;
+        }
+
+        .result-box {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        #exposureTimeResult {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ffeeba;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            font-size: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        @media (max-width: 800px) {
+            #container {
+                flex-direction: column;
+            }
+
+            #results, #exposureTimeSection {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Position du soleil et temps d'exposition optimal de Sol'Ex</h1>
+
+    <div id="container">
+        <div id="results" class="result-box">
+            <h2>Résultats :</h2>
+            <p id="resultsContent"></p>
+        </div>
+
+        <div id="exposureTimeSection" class="result-box">
+            <h2>Calcul du temps d'exposition</h2>
+            <form id="exposureTimeForm">
+                <label for="V">V (multiple de la vitesse sidérale) :</label>
+                <input type="number" id="V" name="V" value="20" required>
+
+                <label for="p">p (taille des pixels, en microns) :</label>
+                <input type="number" id="p" name="p" value="2.4" step="any" required>
+
+                <label for="F">F (focale de la lunette, en millimètres) :</label>
+                <input type="number" id="F" name="F" value="400" required>
+
+                <label for="delta">Déclinaison (delta, en degrés) :</label>
+                <input type="number" id="delta" name="delta" step="any" required>
+
+                <label for="binning">Binning :</label>
+                <input type="number" id="binning" name="binning" value="1" min="1" step="1" required>
+
+                <button type="button" onclick="calculateExposureTime()">Calculer le temps d'exposition</button>
+            </form>
+            <div id="exposureTimeResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // Lancer le script au chargement de la page
+        window.onload = function() {
+            getSunPosition();
+        };
+
+        function getSunPosition() {
+            // Vérifier si la géolocalisation est supportée
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(success, error);
+            } else {
+                alert("La géolocalisation n'est pas supportée par ce navigateur.");
+            }
+        }
+
+        function success(position) {
+            var latitude = position.coords.latitude;
+            var longitude = position.coords.longitude;
+
+            // Obtenir la date et l'heure actuelles
+            var dateTime = new Date();
+
+            // Calcul du Jour Julien
+            var JD = getJulianDate(dateTime);
+
+            // Calcul de la position du Soleil
+            var sunCoords = sunPosition(JD);
+
+            // Conversion de l'ascension droite en HH:mm:ss
+            var raHMS = degreesToHMS(sunCoords.rightAscension / 15); // Diviser par 15 pour convertir les degrés en heures
+
+            // Conversion de la déclinaison en degrés, minutes, secondes
+            var decDMS = degreesToDMS(sunCoords.declination);
+
+            // Calcul de l'Azimut et de l'Altitude
+            var altAz = calculateAltAz(sunCoords.rightAscension, sunCoords.declination, dateTime, latitude, longitude);
+
+            // Conversion de l'Azimut et de l'Altitude en degrés, minutes, secondes
+            var azimuthDMS = degreesToDMS(altAz.azimuth);
+            var altitudeDMS = degreesToDMS(altAz.altitude);
+
+            // Affichage des résultats
+            var results = "<strong>Votre Position :</strong><br>" +
+                          "Latitude : " + latitude.toFixed(6) + " degrés<br>" +
+                          "Longitude : " + longitude.toFixed(6) + " degrés<br><br>" +
+                          "<strong>Date et Heure :</strong><br>" + dateTime.toUTCString() + "<br><br>" +
+                          "<strong>Ascension Droite :</strong> " + raHMS + "<br>" +
+                          "<strong>Déclinaison :</strong> " + decDMS + "<br><br>" +
+                          "<strong>Azimut :</strong> " + azimuthDMS + "<br>" +
+                          "<strong>Altitude :</strong> " + altitudeDMS;
+
+            document.getElementById("resultsContent").innerHTML = results;
+
+            // Afficher la section du temps d'exposition
+            document.getElementById("exposureTimeSection").style.display = "block";
+
+            // Préremplir le champ delta avec la déclinaison calculée
+            document.getElementById("delta").value = sunCoords.declination.toFixed(6);
+        }
+
+        function error() {
+            alert("Impossible d'obtenir votre localisation.");
+        }
+
+        function getJulianDate(date) {
+            // Convertir la date en Jour Julien
+            var time = date.getTime();
+            var JD = (time / 86400000) + 2440587.5;
+            return JD;
+        }
+
+        function sunPosition(jd) {
+            // Nombre de jours depuis J2000.0
+            var n = jd - 2451545.0;
+
+            // Longitude moyenne du Soleil (en degrés)
+            var L = (280.460 + 0.9856474 * n) % 360;
+
+            // Anomalie moyenne du Soleil (en degrés)
+            var g = (357.528 + 0.9856003 * n) % 360;
+
+            // Convertir g en radians pour les calculs trigonométriques
+            var gRad = toRadians(g);
+
+            // Longitude écliptique du Soleil (en degrés)
+            var lambda = L + 1.915 * Math.sin(gRad) + 0.020 * Math.sin(2 * gRad);
+
+            // Obliquité de l'écliptique (en degrés)
+            var epsilon = 23.439 - 0.0000004 * n;
+
+            // Convertir lambda et epsilon en radians
+            var lambdaRad = toRadians(lambda);
+            var epsilonRad = toRadians(epsilon);
+
+            // Ascension droite (en radians)
+            var alphaRad = Math.atan2(Math.cos(epsilonRad) * Math.sin(lambdaRad), Math.cos(lambdaRad));
+
+            // Déclinaison (en radians)
+            var deltaRad = Math.asin(Math.sin(epsilonRad) * Math.sin(lambdaRad));
+
+            // Convertir en degrés
+            var alpha = toDegrees(alphaRad);
+            var delta = toDegrees(deltaRad);
+
+            // S'assurer que l'ascension droite est positive
+            if (alpha < 0) {
+                alpha += 360;
+            }
+
+            return {
+                rightAscension: alpha,
+                declination: delta
+            };
+        }
+
+        function calculateAltAz(ra, dec, date, lat, lon) {
+            // Convertir les valeurs en radians
+            var raRad = toRadians(ra);
+            var decRad = toRadians(dec);
+            var latRad = toRadians(lat);
+
+            // Temps sidéral local
+            var lst = getLocalSiderealTime(date, lon);
+            var lstRad = toRadians(lst * 15); // Convertir les heures sidérales en degrés puis en radians
+
+            // Angle horaire
+            var haRad = lstRad - raRad;
+
+            // Ajuster l'angle horaire dans la plage [0, 2π]
+            haRad = (haRad + 2 * Math.PI) % (2 * Math.PI);
+
+            // Calcul de l'Altitude
+            var altitudeRad = Math.asin(Math.sin(decRad) * Math.sin(latRad) + Math.cos(decRad) * Math.cos(latRad) * Math.cos(haRad));
+
+            // Calcul de l'Azimut
+            var azimuthRad = Math.acos((Math.sin(decRad) - Math.sin(altitudeRad) * Math.sin(latRad)) / (Math.cos(altitudeRad) * Math.cos(latRad)));
+
+            // Ajuster l'Azimut en fonction du quadrant
+            if (Math.sin(haRad) > 0) {
+                azimuthRad = 2 * Math.PI - azimuthRad;
+            }
+
+            // Convertir en degrés
+            var altitude = toDegrees(altitudeRad);
+            var azimuth = toDegrees(azimuthRad);
+
+            return {
+                altitude: altitude,
+                azimuth: azimuth
+            };
+        }
+
+        function getLocalSiderealTime(date, lon) {
+            // Calcul du temps sidéral à Greenwich (en heures)
+            var jd = getJulianDate(date);
+            var T = (jd - 2451545.0) / 36525.0;
+            var GST = 280.46061837 + 360.98564736629 * (jd - 2451545.0) +
+                      0.000387933 * T * T - (T * T * T) / 38710000.0;
+
+            GST = GST % 360.0;
+            if (GST < 0) {
+                GST += 360.0;
+            }
+
+            // Temps sidéral local (en heures)
+            var LST = (GST + lon) % 360.0;
+            if (LST < 0) {
+                LST += 360.0;
+            }
+            return LST / 15.0; // Convertir en heures
+        }
+
+        function degreesToHMS(degrees) {
+            var totalSeconds = degrees * 3600;
+            var hours = Math.floor(totalSeconds / 3600);
+            totalSeconds = totalSeconds % 3600;
+            var minutes = Math.floor(totalSeconds / 60);
+            var seconds = totalSeconds % 60;
+
+            return padZero(hours) + "h " + padZero(minutes) + "m " + padZero(seconds.toFixed(2)) + "s";
+        }
+
+        function degreesToDMS(degrees) {
+            var sign = degrees >= 0 ? "+" : "–";
+            degrees = Math.abs(degrees);
+            var deg = Math.floor(degrees);
+            var minutes = Math.floor((degrees - deg) * 60);
+            var seconds = ((degrees - deg - minutes / 60) * 3600);
+
+            return sign + deg + "° " + padZero(minutes) + "' " + padZero(seconds.toFixed(2)) + "\"";
+        }
+
+        function padZero(num) {
+            return (num < 10 ? "0" : "") + num;
+        }
+
+        function toRadians(degrees) {
+            return degrees * Math.PI / 180;
+        }
+
+        function toDegrees(radians) {
+            return radians * 180 / Math.PI;
+        }
+
+        function calculateExposureTime() {
+            var V = parseFloat(document.getElementById("V").value);
+            var p = parseFloat(document.getElementById("p").value);
+            var F = parseFloat(document.getElementById("F").value);
+            var delta = parseFloat(document.getElementById("delta").value);
+            var binning = parseInt(document.getElementById("binning").value);
+
+            if (isNaN(V) || isNaN(p) || isNaN(F) || isNaN(delta) || isNaN(binning)) {
+                alert("Veuillez entrer des valeurs valides pour V, p, F, delta et binning.");
+                return;
+            }
+
+            // Calcul du temps d'exposition t en secondes
+            var deltaRad = toRadians(delta);
+            var cosDelta = Math.cos(deltaRad);
+
+            var t = (8.79 * p) / (F * V * cosDelta);
+
+            // Appliquer le binning
+            t = t * binning;
+
+            // Convertir t en millisecondes
+            t = t * 1000;
+
+            // Affichage du résultat
+            var result = "Temps d'exposition t = " + t.toFixed(2) + " millisecondes";
+            document.getElementById("exposureTimeResult").innerHTML = result;
+        }
+    </script>
+</body>
+</html>
